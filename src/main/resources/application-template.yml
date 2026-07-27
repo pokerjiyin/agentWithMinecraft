@@ -1,0 +1,39 @@
+server:
+  port: 8081
+
+  spring:
+    application:
+      name: agentWithMinecraft
+    devtools:
+      restart:
+        enable: false
+
+  # ChromaDB
+  chromadb:
+    host: ${CHROMA_HOST:localhost}
+    port: ${CHROMA_PORT:8001}
+
+  # DeepSeek LLM
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY}
+    base-url: https://api.deepseek.com/anthropic
+    chat-model: ${LLM_MODEL:deepseek-v4-flash}
+    embedding-model: ${EMBEDDING_MODEL:text-embedding-v4}
+
+  # Node.js Bot
+  nodejs:
+    service-url: ${NODE_SERVICE_URL:http://localhost:3000}
+
+  # RAG
+  rag:
+    chunk-size: 500
+    chunk-overlap: 50
+    top-k: 5
+    collection-prefix: minecraft
+
+  logging:
+    level:
+      com.minecraft.agent: DEBUG
+      dev.langchain4j: DEBUG
+
+
