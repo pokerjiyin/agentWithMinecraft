@@ -1,5 +1,5 @@
 """
-  LangGraph 节点实现 —— 每个节点是一个独立的处理函数
+LangGraph 节点实现 —— 每个节点是一个独立的处理函数
 """
 
 
@@ -97,7 +97,7 @@ def execute_step(state: AgentState) -> dict:
     step_idx = state.get("current_step",0)
 
     if step_idx >= len(plan):
-        return {"task_complete": True}
+        return {"task_completed": True}
 
     current_action = plan[step_idx]
 
@@ -122,10 +122,10 @@ def check_completion(state: AgentState) -> dict:
     step_idx = state.get("current_step",0)
 
     if step_idx >= len(plan):
-        return {"task_complete": True}
+        return {"task_completed": True}
 
     return{
-        "task_complete": False,
+        "task_completed": False,
         "messages": [
             HumanMessage(
                 content=f"继续执行步骤 {step_idx + 1}：{plan[step_idx]}"
