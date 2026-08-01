@@ -79,5 +79,4 @@ def build_graph():
     # ===== 未完成：回到规划 =====
     workflow.add_edge("check_completion","plan_task")
 
-    # ===== 编译 =====
-    return workflow.compile()
+    return workflow

@@ -2,9 +2,12 @@
 应用配置 —— 从 .env 文件和环境变量读取
 """
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# .env 位于项目根目录（与 java-service、python-agent 同级）
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
+load_dotenv(ROOT_DIR / ".env")
 
 
 class Settings:
@@ -13,7 +16,7 @@ class Settings:
     # ===== DeepSeek =====
     deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "sk-xxx")
     llm_model: str = os.getenv("LLM_MODEL", "deepseek-chat")
-    deepseek_base_url: str = "https://api.deepseek.com/anthropic"
+    deepseek_base_url: str = "https://api.deepseek.com/v1"
 
     # ===== ChromaDB =====
     chroma_host: str = os.getenv("CHROMA_HOST", "localhost")
