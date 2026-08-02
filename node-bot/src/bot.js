@@ -3,8 +3,8 @@
  * 连接管理、状态追踪、断连重连、卡死检测
  */
 const mineflayer = require("mineflayer");
-const { register } = require("module");
 const path = require("path");
+const pathfinder = require("mineflayer-pathfinder").pathfinder;
 require("dotenv").config({path: path.resolve(__dirname,"../../.env")});
 
 // ===== 配置 =====
@@ -63,6 +63,7 @@ function createBot(){
     hideErrors: false,
   });
 
+  bot.loadPlugin(pathfinder);
   registerEvents(bot);
   return bot;
 }
@@ -96,7 +97,7 @@ function registerEvents(bot){
 }
 
 function onSpawn(){
-  console.log('[Bot]已加入服务器 -> ${CONFIG.host}:${CONFIG.port}');
+  console.log(`[Bot]已加入服务器 -> ${CONFIG.host}:${CONFIG.port}`);
   state.online = true;
   reconnectAttempts = 0;
   lastMoveTime = Date.now();
@@ -104,9 +105,9 @@ function onSpawn(){
 }
 
 function onEnd(reason){
-  console.log('[Bot] 连接断开: ${reason}')
+  console.log(`[Bot] 连接断开: ${reason}`)
   state.online = false;
-  clearStuckDetection;
+  clearStuckDetection();
   scheduleReconnect();
 }
 
@@ -163,7 +164,7 @@ function scheduleReconnect(){
   );
   reconnectAttempts++;
 
-  console.log('[Bot] ${delay / 1000}s 后尝试第 ${reconnectAttempts} 次重连...')
+  console.log(`[Bot] ${delay / 1000}s 后尝试第 ${reconnectAttempts} 次重连...`)
 
   reconnectTimer = setTimeout(() => {
     console.log("[Bot] 正在重连...");
@@ -201,7 +202,7 @@ function clearStuckDetection() {
 
 // ===== 主动断开 =====
 function disconnect(){
-  RECONNECT.enable = false;
+  RECONNECT.enabled = false;
   cancelReconnect();
   clearStuckDetection();
   if (bot) {
