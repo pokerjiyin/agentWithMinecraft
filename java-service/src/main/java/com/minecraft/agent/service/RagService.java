@@ -96,11 +96,20 @@ public class RagService {
 
         int totalChunks = 0;
         for(File file : files){
+
+            if (getStoredHash(file.getName()) != null) {
+                log.debug("文件已存在，跳过: {}", file.getName());
+                continue;
+            }
+
             List<TextSegment> chunks = loadAndSplit(file);
             List<Embedding> embeddings = embeddingModel.embedAll(chunks).content();
             embeddingStore.addAll(embeddings, chunks);
             totalChunks += chunks.size();
             log.info("已索引: {} → {} 个片段", file.getName(), chunks.size());
+
+            //索引成功后必须记录 MD5，否则下次还会再索引一遍
+            saveHash(file.getName(), md5(file));
         }
 
         return Map.of(
