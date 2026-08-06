@@ -1,5 +1,6 @@
 package com.minecraft.agent.service;
 
+import org.springframework.context.annotation.Lazy;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.Metadata;
@@ -29,14 +30,15 @@ import java.util.*;
  * @create: 2026-08-04 13:31
  **/
 
+@Lazy
 @Slf4j
 @Service
 public class RagService {
 
     private final EmbeddingModel embeddingModel;
-    private final EmbeddingStore<TextSegment> embeddingStore;
     private final String collectionName;
     private final org.springframework.web.reactive.function.client.WebClient chromaClient;
+    private EmbeddingStore<TextSegment> embeddingStore;
 
     @Value("${rag.chunk-size:500}")
     private int chunkSize;
@@ -48,25 +50,19 @@ public class RagService {
     private int topK;
 
     public RagService(
-            @Value("${deepseek.api-key}") String apiKey,
-            @Value("${deepseek.base-url}") String baseUrl,
-            @Value("${deepseek.embedding-model}") String embeddingModelName,
+            @Value("${dashscope.api-key}") String apiKey,
+            @Value("${dashscope.base-url}") String baseUrl,
+            @Value("${dashscope.embedding-model}") String embeddingModelName,
             @Value("${chromadb.host}") String chromaHost,
             @Value("${chromadb.port}") int chromaPort,
             @Value("${rag.collection-prefix:minecraft}") String collectionPrefix
     ){
 
-        // 1. Embedding 模型（DeepSeek，兼容 OpenAI API）
+        // Embedding 模型（DeepSeek，兼容 OpenAI API）
         this.embeddingModel = OpenAiEmbeddingModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .modelName(embeddingModelName)
-                .build();
-
-        // 2. ChromaDB 向量存储
-        this.embeddingStore = ChromaEmbeddingStore.builder()
-                .baseUrl("http://" + chromaHost + ":" + chromaPort)
-                .collectionName(collectionPrefix + "_wiki")
                 .build();
 
         this.collectionName = collectionPrefix + "_wiki";
@@ -74,7 +70,10 @@ public class RagService {
                 .baseUrl("http://" + chromaHost + ":" + chromaPort)
                 .build();
 
-        log.info("RagService 初始化完成");
+        // TODO: ChromaDB 部署后取消注释
+        // ChromaDB 未部署，暂时跳过连接
+        this.embeddingStore = null;
+        log.info("RagService 初始化完成（ChromaDB 暂未连接）");
     }
 
     // ===== 文档索引 =====
@@ -82,6 +81,11 @@ public class RagService {
      * 批量索引文档目录下的所有 txt/md 文件
      */
     public Map<String, Object> indexDocuments(String directoryPath){
+
+        if (embeddingStore == null) {
+            return Map.of("status", "error", "message", "ChromaDB 未连接");
+        }
+
         File dir = new File(directoryPath);
         if(!dir.exists() || !dir.isDirectory()){
             throw new RuntimeException("目录不存在: " + directoryPath);
@@ -124,6 +128,12 @@ public class RagService {
      * Top-K 相似度检索
      */
     public List<Map<String, Object>> search(String query, int k){
+
+        if (embeddingStore == null) {
+            log.warn("RAG 检索失败：ChromaDB 未连接");
+            return List.of();
+        }
+
         Embedding queryEmbedding = embeddingModel.embed(query).content();
 
         EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
@@ -144,6 +154,11 @@ public class RagService {
 
     // ===== MD5 更新 =====
     public Map<String, Object> updateDocuments(String directoryPath){
+
+        if (embeddingStore == null) {
+            return Map.of("status", "error", "message", "ChromaDB 未连接");
+        }
+
         File dir = new File(directoryPath);
         if(!dir.exists() || !dir.isDirectory()){
             throw new RuntimeException("目录不存在: " + directoryPath);

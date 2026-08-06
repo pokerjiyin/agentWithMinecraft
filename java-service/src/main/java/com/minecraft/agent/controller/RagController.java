@@ -1,5 +1,6 @@
 package com.minecraft.agent.controller;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,7 +23,7 @@ public class RagController {
 
     private final RagService ragService;
 
-    public RagController(RagService ragService) {
+    public RagController(@Lazy RagService ragService) {
         this.ragService = ragService;
     }
 

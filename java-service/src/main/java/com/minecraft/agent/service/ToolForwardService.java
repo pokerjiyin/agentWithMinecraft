@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -21,11 +22,11 @@ public class ToolForwardService {
     private final WebClient webClient;
 
     public ToolForwardService(
-            @Value("${nodejs.service-url}") String nodeServiceUrl){
+            @Value("${nodejs.service-url}") String nodeServiceUrl) {
         this.webClient = WebClient.builder()
                 .baseUrl(nodeServiceUrl)
                 .build();
-        log.info("ToolForwardService 初始化完成 → {}", nodeServiceUrl);
+        log.info("ToolForwardService 初始化完成 → {} (超时: 5s)", nodeServiceUrl);
     }
 
     // ===== 移动 =====
@@ -78,6 +79,8 @@ public class ToolForwardService {
     }
 
     // ===== 通用 HTTP 方法 =====
+    private static final Duration TIMEOUT = Duration.ofSeconds(5);
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> post(String path, Object body) {
         try {
@@ -86,6 +89,7 @@ public class ToolForwardService {
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(Map.class)
+                    .timeout(TIMEOUT)
                     .block();
         } catch (Exception e) {
             log.error("POST {} 失败: {}", path, e.getMessage());
@@ -100,6 +104,7 @@ public class ToolForwardService {
                     .uri(path)
                     .retrieve()
                     .bodyToMono(Map.class)
+                    .timeout(TIMEOUT)
                     .block();
         } catch (Exception e) {
             log.error("GET {} 失败: {}", path, e.getMessage());

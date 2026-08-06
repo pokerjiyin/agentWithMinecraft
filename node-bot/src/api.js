@@ -24,6 +24,11 @@ module.exports = function(botRef){
       err.statusCode = 503;
       throw err;
     }
+    if (!botRef.getState().online) {
+      const err = new Error("Bot 未进入游戏，请先启动 Minecraft 服务器");
+      err.statusCode = 503;
+      throw err;
+    }
     return bot;
   }
 

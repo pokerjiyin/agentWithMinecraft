@@ -56,6 +56,18 @@ class JavaTools:
             "count": count,
         })
 
+    async def open_chest(self, x: int, y: int, z: int) -> dict:
+        return await self._post("/api/tools/open_chest", {"x": x, "y": y, "z": z})
+
+    async def use(self, action: str, target: dict = None,
+                  item_name: str = None) -> dict:
+        body = {"action": action}
+        if target:
+            body["target"] = target
+        if item_name:
+            body["itemName"] = item_name
+        return await self._post("/api/tools/use", body)
+
     async def get_status(self) -> dict:
         return await self._get("/api/tools/status")
 
