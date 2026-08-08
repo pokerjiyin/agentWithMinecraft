@@ -22,35 +22,46 @@ public class ToolController {
         this.toolService = toolService;
     }
 
+    // 容错：LLM 可能返回字符串形式的数字
+    private double toDouble(Object v) {
+        if (v == null) return 0;
+        if (v instanceof Number) return ((Number) v).doubleValue();
+        return Double.parseDouble(v.toString());
+    }
+
+    private int toInt(Object v) {
+        return (int) toDouble(v);
+    }
+
     @PostMapping("/move")
     public Map<String, Object> move(@RequestBody Map<String,Object> req) {
-        double x = ((Number) req.get("x")).doubleValue();
-        double y = ((Number) req.get("y")).doubleValue();
-        double z = ((Number) req.get("z")).doubleValue();
+        double x = toDouble(req.get("x"));
+        double y = toDouble(req.get("y"));
+        double z = toDouble(req.get("z"));
         return toolService.move(x, y, z);
     }
 
     @PostMapping("/dig")
     public Map<String,Object> dig(@RequestBody Map<String,Object> req) {
-        int x = ((Number) req.get("x")).intValue();
-        int y = ((Number) req.get("y")).intValue();
-        int z = ((Number) req.get("z")).intValue();
+        int x = toInt(req.get("x"));
+        int y = toInt(req.get("y"));
+        int z = toInt(req.get("z"));
         return toolService.chopTree(x, y, z);
     }
 
     @PostMapping("/chop_tree")
     public Map<String, Object> chopTree(@RequestBody Map<String, Object> req) {
-        int x = ((Number) req.get("x")).intValue();
-        int y = ((Number) req.get("y")).intValue();
-        int z = ((Number) req.get("z")).intValue();
+        int x = toInt(req.get("x"));
+        int y = toInt(req.get("y"));
+        int z = toInt(req.get("z"));
         return toolService.chopTree(x, y, z);
     }
 
     @PostMapping("/craft")
     public Map<String, Object> craft(@RequestBody Map<String, Object> req) {
         String recipe = (String) req.get("recipe");
-        int count = req.containsKey("count")
-                ? ((Number) req.get("count")).intValue()
+        int count = req.containsKey("count") && req.get("count") != null
+                ? toInt(req.get("count"))
                 : 1;
         return toolService.craft(recipe, count);
     }
@@ -71,9 +82,9 @@ public class ToolController {
 
     @PostMapping("/open_chest")
     public Map<String, Object> openChest(@RequestBody Map<String, Object> req) {
-        int x = ((Number) req.get("x")).intValue();
-        int y = ((Number) req.get("y")).intValue();
-        int z = ((Number) req.get("z")).intValue();
+        int x = toInt(req.get("x"));
+        int y = toInt(req.get("y"));
+        int z = toInt(req.get("z"));
         return toolService.openChest(x, y, z);
     }
 

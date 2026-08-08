@@ -15,7 +15,19 @@ const{
 
 module.exports = function(botRef){
   // botRef 是一个 { getBot } 对象，每次请求动态获取最新 bot 实例
-  // botRef = {getBot, getState, createBot, disconnect}
+  // botRef = {getBot, getState, createBot, disconnect, setTaskActive}
+  // ===== 辅助：任务包装器（标记任务开始/结束） =====
+  function withTask(fn) {
+    return async (req, res) => {
+      botRef.setTaskActive(true);
+      try {
+        await fn(req, res);
+      } finally {
+        botRef.setTaskActive(false);
+      }
+    };
+  }
+
   // ===== 辅助：获取在线 bot =====
   function requireBot(){
     const bot = botRef.getBot();
@@ -33,7 +45,7 @@ module.exports = function(botRef){
   }
 
   // ===== 移动 =====
-  router.post("/api/bot/move", async(req, res) => {
+  router.post("/api/bot/move", withTask(async(req, res) => {
     try{
       const bot = requireBot();
       const{x, y, z} = req.body;
@@ -42,10 +54,10 @@ module.exports = function(botRef){
     }catch(e){
       res.status(e.statusCode || 500).json({error: e.message});
     }
-  });
+  }));
 
   // ===== 挖掘 =====
-  router.post("/api/bot/dig", async(req, res) => {
+  router.post("/api/bot/dig", withTask(async(req, res) => {
     try{
       const bot = requireBot();
       const{x, y, z} = req.body;
@@ -54,10 +66,10 @@ module.exports = function(botRef){
     }catch(e){
       res.status(e.statusCode || 500).json({ error: e.message });
     }
-  });
+  }));
   
   // ===== 砍树 =====
-  router.post("/api/bot/chop_tree", async(req, res) => {
+  router.post("/api/bot/chop_tree", withTask(async(req, res) => {
     try{
       const bot = requireBot();
       const{x, y, z} = req.body;
@@ -66,10 +78,10 @@ module.exports = function(botRef){
     }catch(e){
       res.status(e.statusCode || 500).json({ error: e.message });
     }
-  });
+  }));
 
   // ===== 合成 =====
-  router.post("/api/bot/craft", async(req, res) => {
+  router.post("/api/bot/craft", withTask(async(req, res) => {
     try{
       const bot = requireBot();
       const{itemName, count} = req.body;
@@ -78,10 +90,10 @@ module.exports = function(botRef){
     }catch(e){
       res.status(e.statusCode || 500).json({ error: e.message });
     }
-  });
+  }));
 
   // ===== 使用物品 =====
-  router.post("/api/bot/use", async(req, res) => {
+  router.post("/api/bot/use", withTask(async(req, res) => {
     try {
       const bot = requireBot();
       const { action, target, itemName } = req.body;
@@ -90,10 +102,10 @@ module.exports = function(botRef){
     }catch(e){
       res.status(e.statusCode || 500).json({ error: e.message });
     }
-  });
+  }));
 
   // ===== 打开箱子 =====
-  router.post("/api/bot/open_chest", async(req, res) => {
+  router.post("/api/bot/open_chest", withTask(async(req, res) => {
     try{
       const bot = requireBot();
       const{x, y ,z} = req.body;
@@ -102,7 +114,7 @@ module.exports = function(botRef){
     }catch(e){
       res.status(e.statusCode || 500).json({ error: e.message });
     }
-  });
+  }));
 
   // ===== 状态查询 =====
   router.get("/api/bot/status", (req, res) => {

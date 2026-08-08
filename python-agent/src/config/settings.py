@@ -15,8 +15,13 @@ class Settings:
 
     # ===== DeepSeek =====
     deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "sk-xxx")
+    deepseek_base_url: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
     llm_model: str = os.getenv("LLM_MODEL", "deepseek-chat")
-    deepseek_base_url: str = "https://api.deepseek.com/v1"
+
+    # ===== Qwen =====
+    qwen_api_key: str = os.getenv("DASHSCOPE_API_KEY", "sk-ws-xxx")
+    qwen_base_url: str = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    qwen_chat_model: str = os.getenv("QWEN_CHAT_MODEL", "qwen3.7-plus")
 
     # ===== ChromaDB =====
     chroma_host: str = os.getenv("CHROMA_HOST", "localhost")

@@ -26,7 +26,7 @@ const RECONNECT = {
 // ===== 卡死检测配置 =====
 const STUCK = {
   checkInterval: 10000, // 每 10 秒检查
-  thresholdMs: 60000, // 60 秒不移动视为卡死
+  thresholdMs: 120000, // 120 秒不移动视为卡死
 };
 
 // ===== Bot 实例与状态 =====
@@ -37,6 +37,7 @@ let stuckTimer = null;
 
 let lastPosition = null;
 let lastMoveTime = Date.now();
+let taskActive = false; // 当前是否在执行任务
 
 // 实时状态
 const state = {
@@ -183,6 +184,7 @@ function cancelReconnect(){
 function startStuckDetection(){
   stuckTimer = setInterval(() => {
     if (!state.online) return;
+    if (!taskActive) return;  // ← 空闲时跳过检测
     const idle = Date.now() - lastMoveTime;
     if (idle > STUCK.thresholdMs) {
       console.log(`[Bot] 卡死检测：${idle / 1000}s 未移动，强制重连`);
@@ -218,4 +220,5 @@ module.exports = {
   getBot,
   getState,
   disconnect,
+  setTaskActive: (active) => { taskActive = active; },
 };

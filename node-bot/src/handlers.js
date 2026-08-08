@@ -4,10 +4,12 @@
  */
 
 const {Vec3} = require("vec3");
+const {Movements, goals} = require("mineflayer-pathfinder");
 
 // ===== 移动 =====
 /**
- * 移动到目标坐标（简单直线移动）
+ * 移动到目标坐标（使用 pathfinder 自动寻路）
+ * 自动绕障碍、跳台阶，无需手动按键
  * @param {Bot} bot - Mineflayer Bot 实例
  * @param {number} x
  * @param {number} y
@@ -15,39 +17,45 @@ const {Vec3} = require("vec3");
  * @returns {Promise<{success: boolean, position: object}>}
  */
 async function handleMove(bot, x, y, z){
-  return new Promise((resolve, reject) => {
-    const target = new Vec3(x, y, z);
+  const target = new Vec3(Math.floor(x), Math.floor(y), Math.floor(z));
+
+  // 配置寻路参数
+  const movements = new Movements(bot);
+  movements.canDig = false;       // 不自动挖方块（避免误挖）
+  movements.canPlace = false;     // 不自动放置方块
+  bot.pathfinder.setMovements(movements);
+
+  // 设置目标（GoalBlock 让 bot 走到方块旁）
+  const goal = new goals.GoalBlock(target.x, target.y, target.z);
+  bot.pathfinder.setGoal(goal);
+
+  // 等待到达（轮询位置）
+  await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
+      clearInterval(check);
       reject(new Error("移动超时"));
     }, 30000);
-    
-    bot.pathfinder.setGoal(null); // 清除旧目标
-    bot.lookAt(target, true, () => {
-      bot.setControlState("forward", true);
-      bot.setControlState("jump", true);
-    })
-    
-    const checkArrived = setInterval(() => {
+
+    const check = setInterval(() => {
       const pos = bot.entity.position;
       const dist = pos.distanceTo(target);
-      if(dist < 1.5){
-        clearInterval(checkArrived);
+      if (dist < 2) {
+        clearInterval(check);
         clearTimeout(timeout);
-        bot.setControlState("forward", false);
-        bot.setControlState("jump", false);
-        resolve({
-          success: true,
-          position: {x: pos.x, y: pos.y, z: pos.z},
-        });
+        bot.pathfinder.setGoal(null);  // 清除目标，停止移动
+        resolve();
       }
     }, 200);
-    
-    bot.once("end", () => {
-      clearInterval(checkArrived);
-      clearTimeout(timeout);
-      reject(new Error("Bot 已断开"));
-    });
   });
+
+  return {
+    success: true,
+    position: {
+      x: bot.entity.position.x,
+      y: bot.entity.position.y,
+      z: bot.entity.position.z,
+    },
+  };
 }
 
 // ===== 挖掘 =====

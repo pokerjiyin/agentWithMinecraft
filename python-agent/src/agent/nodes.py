@@ -14,9 +14,9 @@ log = logging.getLogger(__name__)
 
 """LLM实例（所有节点共享）"""
 llm = ChatOpenAI(
-    model = settings.llm_model,
-    api_key = settings.deepseek_api_key,
-    base_url = settings.deepseek_base_url,
+    model = settings.qwen_chat_model,
+    api_key = settings.qwen_api_key,
+    base_url = settings.qwen_base_url,
     temperature = 0.7,
 )
 
@@ -70,137 +70,103 @@ async def rag_retrieve(state: AgentState) -> dict:
 
     return {"rag_context": rag_context}
 
+# ===== ReAct Agent 节点 =====
 
+MAX_ITERATIONS = 15  # 最多 15 轮，防止死循环
 
-async def plan_task(state: AgentState) -> dict:
+async def agent(state: AgentState) -> dict:
     """
-    节点 3：任务规划
-    根据 RAG 上下文，将用户指令拆解为具体步骤
-    仅首次调用时规划，循环回来时跳过
+    ReAct 循环的"思考"节点
+    看对话历史 + RAG 知识，决定下一步：调工具 or 结束
     """
-    existing_plan = state.get("plan", [])
-    if existing_plan:
-        # 已有计划，不重规划，继续执行
-        return {}
-
-    user_msg = state["messages"][-1].content
-    rag = state.get("rag_context", "")
-
-    prompt = f"""你是 Minecraft 任务规划器。根据以下信息，将用户指令拆解为具体执行步骤。
-
-  RAG 知识：{rag}
-
-  用户指令：{user_msg}
-
-  请列出执行步骤，每行一个步骤，格式：
-  1. 第一步
-  2. 第二步
-  ...
-
-  只需要列出步骤，不要其他解释。"""
-
-    response = await llm.ainvoke(prompt)
-    lines = response.content.strip().split("\n")
-    plan = [
-        line.split(". ", 1)[1] if ". " in line else line
-        for line in lines
-        if line.strip()
-    ]
-
-    return {"plan": plan, "current_step": 0}
-
-async def execute_step(state: AgentState) -> dict:
-    """
-    节点 4：执行单个步骤
-    调用 Java 工具 API 执行当前步骤
-    """
-    plan = state.get("plan",[])
-    step_idx = state.get("current_step",0)
-
-    if step_idx >= len(plan):
-        return {"task_completed": True}
-
-    current_action = plan[step_idx]
-
-    # 让 LLM 把自然语言步骤解析成工具调用
-    parse_prompt = f"""你是 Minecraft 指令解析器。将操作步骤转换为工具调用 JSON。
-
-      可用工具：
-      - move(x, y, z)          — 移动到坐标
-      - dig(x, y, z)           — 挖掘方块
-      - chop_tree(x, y, z)     — 砍树
-      - craft(recipe, count)   — 合成物品
-      - use(action, target, itemName) — 使用物品
-      - open_chest(x, y, z)    — 打开箱子
-      - get_status()           — 获取状态
-      - get_inventory()        — 获取背包
-
-      操作：{current_action}
-
-      只返回 JSON，不要其他内容：
-      {{"tool": "工具名", "params": {{"x": 1, "y": 2, "z": 3}}}}"""
-
-    try:
-        response = await llm.ainvoke(parse_prompt)
-        tool_call = json.loads(response.content.strip())
-        tool = tool_call.get("tool")
-        params = tool_call.get("params", {})
-
-        # 路由到对应的工具
-        tool_map = {
-            "move": java_tools.move,
-            "dig": java_tools.dig,
-            "chop_tree": java_tools.chop_tree,
-            "craft": lambda **kw: java_tools.craft(
-                kw.get("recipe", ""), kw.get("count", 1)
-            ),
-            "use": lambda **kw: java_tools.use(
-                kw.get("action", ""), kw.get("target"), kw.get("itemName")
-            ),
-            "open_chest": java_tools.open_chest,
-            "get_status": java_tools.get_status,
-            "get_inventory": java_tools.get_inventory,
+    iterations = state.get("iterations", 0)
+    if iterations >= MAX_ITERATIONS:
+        # 超过上限，强制结束
+        return {
+            "messages": [AIMessage(content="任务步骤过多，已自动终止")],
+            "iterations": iterations,
         }
 
-        if tool in tool_map:
-            result = await tool_map[tool](**params)
-            msg = (
-                f"[步骤 {step_idx + 1}/{len(plan)}] {current_action}\n"
-                f"→ {tool} → {result.get('success', '执行完成')}"
-            )
-        else:
-            msg = f"[步骤 {step_idx + 1}] {current_action} → 未知工具: {tool}"
+    rag = state.get("rag_context", "")
 
-    except(json.JSONDecodeError, KeyError):
-        # LLM 返回格式不对，降级为模拟执行
-        msg = (
-            f"[模拟执行] 步骤 {step_idx + 1}/{len(plan)}："
-            f"{current_action} ✓ 完成"
-        )
-    except Exception as e:
-        msg = f"[步骤 {step_idx + 1}] {current_action} → 执行失败: {e}"
+    # 取最近 6 条消息作为上下文（防止历史无限膨胀）
+    history = state["messages"][-6:]
+    history_text = "\n".join(f"{'用户' if m.type == 'human' else 'AI'}: {m.content}" for m in history)
+    prompt = f"""你是 Minecraft AI 操控智能体。根据对话历史决定下一步动作。
 
-    ai_msg = AIMessage(content=msg)
+  RAG 知识：
+  {rag}
+
+  最近对话：
+  {history_text}
+
+  可用工具（只能选这些）：
+  - move(x, y, z)            移动到绝对坐标
+  - dig(x, y, z)             挖掘方块
+  - chop_tree(x, y, z)       砍树
+  - craft(recipe, count)     合成物品
+  - use(action, target, itemName)  使用物品
+  - open_chest(x, y, z)      打开箱子
+  - get_status()             获取当前位置/血量/背包
+  - get_inventory()          获取背包
+
+  规则：
+  1. 需要操作游戏时，调用对应工具
+  2. 不知道坐标/材料时，先调用 get_status() 或 get_inventory()
+  3. 工具的结果会在下一轮喂给你，基于结果继续决策
+  4. 任务完成或无法继续时，输出最终回答
+
+  只输出一个 JSON，不要其他内容：
+  - 调工具：{{"tool": "move", "params": {{"x": 100, "y": 64, "z": 200}}}}
+  - 完成任务：{{"answer": "你的回复"}}"""
+
+    response = await llm.ainvoke(prompt)
     return {
-        "messages": [ai_msg],
-        "current_step": step_idx + 1,
+        "messages": [AIMessage(content=response.content)],
+        "iterations": iterations + 1,
     }
 
-def check_completion(state: AgentState) -> dict:
+async def execute_tool(state: AgentState) -> dict:
     """
-    节点 5：检查任务是否完成
+    ReAct 循环的"执行"节点
+    解析 agent 输出的工具调用，执行，把结果作为观察塞回对话
     """
-    plan = state.get("plan",[])
-    step_idx = state.get("current_step",0)
+    # 取最后一条 AI 决策
+    last_ai = state["messages"][-1]
 
-    if step_idx >= len(plan):
-        return {"task_completed": True}
+    try:
+        data = json.loads(last_ai.content)
+        tool = data.get("tool")
+        params = data.get("params", {})
+    except (json.JSONDecodeError, TypeError):
+        return {
+            "messages": [HumanMessage(content="解析失败，请重新决策")],
+        }
 
-    return{
-        "task_completed": False,
-        "messages": [
-            HumanMessage(
-                content=f"继续执行步骤 {step_idx + 1}：{plan[step_idx]}"
-            )
-        ],
+    tool_map = {
+        "move": java_tools.move,
+        "dig": java_tools.dig,
+        "chop_tree": java_tools.chop_tree,
+        "craft": lambda **kw: java_tools.craft(
+            kw.get("recipe", ""), kw.get("count", 1)
+        ),
+        "use": lambda **kw: java_tools.use(
+            kw.get("action", ""), kw.get("target"), kw.get("itemName")
+        ),
+        "open_chest": java_tools.open_chest,
+        "get_status": java_tools.get_status,
+        "get_inventory": java_tools.get_inventory,
+    }
+
+    if tool in tool_map:
+        try:
+            result = await tool_map[tool](**params)
+            observation = f"工具 {tool} 执行结果: {result}"
+        except Exception as e:
+            observation = f"工具 {tool} 执行失败: {e}"
+    else:
+        observation = f"未知工具: {tool}，请重新选择"
+    # 观察结果以 HumanMessage 喂回给 agent
+    return {
+        "messages": [HumanMessage(content=observation)]
     }

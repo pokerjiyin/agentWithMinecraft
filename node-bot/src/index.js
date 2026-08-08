@@ -7,7 +7,7 @@ const http = require("http");
 const path = require("path");
 require("dotenv").config({path: path.resolve(__dirname, "../../.env")});
 
-const{createBot, getBot, getState, disconnect} = require("./bot");
+const {createBot, getBot, getState, disconnect, setTaskActive} = require("./bot");
 const createApiRouter = require("./api");
 const createWebSocket = require("./websocket");
 
@@ -18,7 +18,7 @@ app.use(express.json());
 const server = http.createServer(app);
 
 // ===== Bot 引用（传给 api 和 websocket） =====
-const botRef = {getBot, getState, createBot, disconnect};
+const botRef = {getBot, getState, createBot, disconnect, setTaskActive};
 
 // ===== 挂载 API 路由 =====
 app.use(createApiRouter(botRef));

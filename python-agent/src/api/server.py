@@ -1,6 +1,7 @@
 """
 FastAPI 服务 —— Agent 对外 HTTP API
 """
+import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
@@ -59,21 +60,27 @@ async def chat(req: ChatRequest, request: Request):
         initial_state: AgentState = {
             "messages": [HumanMessage(content=req.message)],
             "intent": "",
-            "plan": [],
-            "current_step": 0,
             "rag_context": "",
-            "game_state": "{}",
-            "task_completed": False,
+            "iterations": 0,
         }
 
         result = await request.app.state.agent.ainvoke(initial_state, config)
 
-        # 提取最后一条 AI 消息
+        # 提取 Agent 的最终回答（可能是 {"answer": "..."} JSON）
         messages = result.get("messages", [])
         reply = ""
         for msg in reversed(messages):
             if msg.type == "ai":
-                reply = msg.content
+                content = msg.content
+                # 尝试解析 ReAct 的 {"answer": "..."} 格式
+                try:
+                    data = json.loads(content)
+                    if isinstance(data, dict) and "answer" in data:
+                        reply = data["answer"]
+                    else:
+                        reply = content
+                except (json.JSONDecodeError, TypeError):
+                    reply = content
                 break
 
         if not reply:

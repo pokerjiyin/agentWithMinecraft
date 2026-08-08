@@ -79,7 +79,7 @@ public class ToolForwardService {
     }
 
     // ===== 通用 HTTP 方法 =====
-    private static final Duration TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> post(String path, Object body) {
